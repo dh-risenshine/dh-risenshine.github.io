@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Batch, please. — CSV Builder</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:     #B16141;
+      --accent-lt:  #C97A55;
+      --accent-dk:  #8A4A30;
+      --bg:         #F7F5F2;
+      --surface:    #FFFFFF;
+      --border:     #E2DDD8;
+      --text:       #1C1917;
+      --muted:      #78716C;
+      --success:    #4A7C59;
+      --radius:     10px;
+      --shadow:     0 2px 12px rgba(0,0,0,0.07);
+      --shadow-lg:  0 8px 32px rgba(0,0,0,0.10);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    header h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.4rem;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    header span {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 32px 20px 0;
+    }
+
+    /* ── Form Card ── */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 28px;
+    }
+    .form-card h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.1rem;
+      margin-bottom: 20px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-card h2 .step {
+      background: var(--accent);
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Text Fields Grid ── */
+    .fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .fields-grid .full { grid-column: 1 / -1; }
+    @media (max-width: 540px) {
+      .fields-grid { grid-template-columns: 1fr; }
+    }
+
+    .field-group label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field-group input, .field-group textarea {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+      resize: vertical;
+    }
+    .field-group input:focus, .field-group textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(177,97,65,0.12);
+      background: #fff;
+    }
+
+    /* ── Selector Section ── */
+    .selector-section { margin-bottom: 0; }
+    .selector-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* Thumbnails (desktop) */
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 0;
+    }
+    @media (max-width: 680px) { .thumb-grid { display: none; } }
+
+    .thumb-card {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+      background: var(--bg);
+      position: relative;
+    }
+    .thumb-card:hover {
+      border-color: var(--accent-lt);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+    .thumb-card.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(177,97,65,0.18);
+    }
+    .thumb-card .thumb-img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      display: block;
+      background: linear-gradient(135deg, #e8e0d8 0%, #d4c9be 100%);
+    }
+    /* Placeholder colour swatches since we don't have real images */
+    .thumb-card .thumb-img.swatch { display: flex; align-items: center; justify-content: center; }
+    .thumb-card .thumb-name {
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 5px 6px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .thumb-card .check {
+      position: absolute;
+      top: 4px; right: 4px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      width: 18px; height: 18px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+    .thumb-card.selected .check { display: flex; }
+
+    /* Dropdown (mobile) */
+    .mobile-select {
+      display: none;
+      width: 100%;
+      padding: 10px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2378716C' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 13px center;
+    }
+    .mobile-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(177,97,65,0.12);
+    }
+    @media (max-width: 680px) { .mobile-select { display: block; } }
+
+    .selectors-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 540px) {
+      .selectors-row { grid-template-columns: 1fr; }
+    }
+
+    /* ── Add Row Button ── */
+    .btn-add {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 24px;
+    }
+    .btn-add:hover { background: var(--accent-lt); }
+    .btn-add:active { transform: scale(0.99); }
+
+    /* ── Batch Table ── */
+    .batch-section h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .batch-count {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: var(--accent);
+      color: #fff;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      min-width: 600px;
+    }
+    thead tr {
+      background: #F0EDE9;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #FAFAF9; }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.1s, background 0.1s;
+    }
+    .btn-delete:hover { color: #C0392B; background: #FEE; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+
+    /* ── Download Bar ── */
+    .download-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+      z-index: 100;
+    }
+    .download-bar span {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .btn-download {
+      padding: 11px 24px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-download:hover { background: var(--accent-lt); }
+    .btn-download:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    .btn-clear {
+      padding: 11px 18px;
+      background: none;
+      color: var(--muted);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-clear:hover { border-color: #C0392B; color: #C0392B; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--text);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 200;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Validation ── */
+    .field-group input.invalid,
+    .field-group textarea.invalid { border-color: #C0392B; }
+    .error-msg {
+      font-size: 0.75rem;
+      color: #C0392B;
+      margin-top: 4px;
+      display: none;
+    }
+    .field-group.has-error .error-msg { display: block; }
+    .selector-error {
+      font-size: 0.75rem;
+      color: #C0392B;
+      margin-top: 6px;
+      display: none;
+    }
+    .selector-error.show { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Batch, please.</h1>
+  <span>CSV Builder</span>
+</header>
+
+<div class="container">
+
+  <!-- ── Step 1: Text Fields ── -->
+  <div class="form-card">
+    <h2><span class="step">1</span> Enter Text Content</h2>
+    <div class="fields-grid">
+      <div class="field-group full">
+        <label>Name <span style="color:#C0392B">*</span></label>
+        <input type="text" id="f-name" placeholder="e.g. Product_Spring_01" autocomplete="off" />
+        <div class="error-msg">Name is required.</div>
+      </div>
+      <div class="field-group">
+        <label>Intro Text</label>
+        <input type="text" id="f-intro" placeholder="e.g. Introducing…" />
+      </div>
+      <div class="field-group">
+        <label>Body Text</label>
+        <input type="text" id="f-body" placeholder="e.g. A short description" />
+      </div>
+      <div class="field-group">
+        <label>Price Text</label>
+        <input type="text" id="f-price" placeholder="e.g. $29.99" />
+      </div>
+      <div class="field-group">
+        <label>Product</label>
+        <input type="text" id="f-product" placeholder="e.g. SKU-1234" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: FG / BG Selectors ── -->
+  <div class="form-card">
+    <h2><span class="step">2</span> Choose Foreground &amp; Background</h2>
+    <div class="selectors-row">
+
+      <!-- Foreground -->
+      <div class="selector-section">
+        <div class="selector-label">Foreground</div>
+        <div class="thumb-grid" id="fg-grid"></div>
+        <select class="mobile-select" id="fg-mobile">
+          <option value="">— Select foreground —</option>
+        </select>
+        <div class="selector-error" id="fg-error">Please select a foreground.</div>
+      </div>
+
+      <!-- Background -->
+      <div class="selector-section">
+        <div class="selector-label">Background</div>
+        <div class="thumb-grid" id="bg-grid"></div>
+        <select class="mobile-select" id="bg-mobile">
+          <option value="">— Select background —</option>
+        </select>
+        <div class="selector-error" id="bg-error">Please select a background.</div>
+      </div>
+
+    </div>
+
+    <button class="btn-add" id="btn-add">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="white" stroke-width="1.5"/><path d="M8 5v6M5 8h6" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Add Row to Batch
+    </button>
+  </div>
+
+  <!-- ── Step 3: Batch Preview ── -->
+  <div class="form-card batch-section">
+    <h2>
+      Batch Preview
+      <span class="batch-count" id="batch-count">0 rows</span>
+    </h2>
+    <div class="table-wrap">
+      <table id="batch-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Intro</th>
+            <th>Body</th>
+            <th>Price</th>
+            <th>Product</th>
+            <th>Foreground</th>
+            <th>Background</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="batch-body">
+          <tr id="empty-row">
+            <td colspan="8">
+              <div class="empty-state">
+                <div class="icon">📋</div>
+                No rows yet — fill in the form above and click Add Row.
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ── Download Bar ── -->
+<div class="download-bar">
+  <div style="display:flex;gap:10px;align-items:center">
+    <button class="btn-clear" id="btn-clear">Clear All</button>
+  </div>
+  <button class="btn-download" id="btn-download" disabled>
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8m0 0L4.5 7m3 3 3-3M2 12h11" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Download CSV
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Asset definitions ──────────────────────────────────────────────────────
+  // Replace the `color` values with real thumbnail image URLs (img src)
+  // when you have your actual assets. The `value` must exactly match
+  // the comp/footage name in After Effects.
+
+  var FG_ASSETS = [
+    { value: "FG_Comp_01", label: "FG 01", color: "#C8B8A2" },
+    { value: "FG_Comp_02", label: "FG 02", color: "#A8C4B8" },
+    { value: "FG_Comp_03", label: "FG 03", color: "#B8A8C4" },
+    { value: "FG_Comp_04", label: "FG 04", color: "#C4B8A8" },
+    { value: "FG_Comp_05", label: "FG 05", color: "#A8B8C4" },
+    { value: "FG_Comp_06", label: "FG 06", color: "#C4A8B8" },
+    { value: "FG_Comp_07", label: "FG 07", color: "#B8C4A8" },
+    { value: "FG_Comp_08", label: "FG 08", color: "#C4C4A8" },
+    { value: "FG_Comp_09", label: "FG 09", color: "#A8C4C4" },
+    { value: "FG_Comp_10", label: "FG 10", color: "#C4A8A8" }
+  ];
+
+  var BG_ASSETS = [
+    { value: "BG_Comp_01", label: "BG 01", color: "#2C3E50" },
+    { value: "BG_Comp_02", label: "BG 02", color: "#3D2B1F" },
+    { value: "BG_Comp_03", label: "BG 03", color: "#1F3D2B" },
+    { value: "BG_Comp_04", label: "BG 04", color: "#2B1F3D" },
+    { value: "BG_Comp_05", label: "BG 05", color: "#3D3320" },
+    { value: "BG_Comp_06", label: "BG 06", color: "#20333D" },
+    { value: "BG_Comp_07", label: "BG 07", color: "#3D2020" },
+    { value: "BG_Comp_08", label: "BG 08", color: "#20203D" },
+    { value: "BG_Comp_09", label: "BG 09", color: "#203D20" },
+    { value: "BG_Comp_10", label: "BG 10", color: "#3D3D20" }
+  ];
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  var batch = [];
+  var selectedFG = null;
+  var selectedBG = null;
+
+  // ── Build thumbnail grids ──────────────────────────────────────────────────
+  function buildGrid(containerId, mobileId, assets, type) {
+    var grid    = document.getElementById(containerId);
+    var mobile  = document.getElementById(mobileId);
+
+    assets.forEach(function(asset) {
+      // Thumbnail card
+      var card = document.createElement("div");
+      card.className = "thumb-card";
+      card.dataset.value = asset.value;
+      card.dataset.type  = type;
+
+      // Image or colour swatch
+      // To use real thumbnails: replace the div below with:
+      // <img class="thumb-img" src="thumbnails/fg/FG_Comp_01.jpg" alt="FG 01" />
+      var swatch = document.createElement("div");
+      swatch.className = "thumb-img swatch";
+      swatch.style.background = asset.color;
+
+      var check = document.createElement("div");
+      check.className = "check";
+      check.innerHTML = "✓";
+
+      var name = document.createElement("div");
+      name.className = "thumb-name";
+      name.textContent = asset.label;
+
+      card.appendChild(swatch);
+      card.appendChild(check);
+      card.appendChild(name);
+      card.addEventListener("click", function() { selectAsset(type, asset.value, containerId); });
+      grid.appendChild(card);
+
+      // Mobile option
+      var opt = document.createElement("option");
+      opt.value = asset.value;
+      opt.textContent = asset.label + " (" + asset.value + ")";
+      mobile.appendChild(opt);
+    });
+
+    mobile.addEventListener("change", function() {
+      if (type === "fg") { selectedFG = this.value || null; }
+      else               { selectedBG = this.value || null; }
+    });
+  }
+
+  function selectAsset(type, value, gridId) {
+    var grid = document.getElementById(gridId);
+    grid.querySelectorAll(".thumb-card").forEach(function(c) { c.classList.remove("selected"); });
+    var card = grid.querySelector('[data-value="' + value + '"]');
+    if (card) card.classList.add("selected");
+    if (type === "fg") {
+      selectedFG = value;
+      document.getElementById("fg-mobile").value = value;
+      document.getElementById("fg-error").classList.remove("show");
+    } else {
+      selectedBG = value;
+      document.getElementById("bg-mobile").value = value;
+      document.getElementById("bg-error").classList.remove("show");
+    }
+  }
+
+  buildGrid("fg-grid", "fg-mobile", FG_ASSETS, "fg");
+  buildGrid("bg-grid", "bg-mobile", BG_ASSETS, "bg");
+
+  // ── Add Row ────────────────────────────────────────────────────────────────
+  document.getElementById("btn-add").addEventListener("click", function() {
+    var valid = true;
+
+    var nameEl = document.getElementById("f-name");
+    var nameGrp = nameEl.closest(".field-group");
+    if (!nameEl.value.trim()) {
+      nameGrp.classList.add("has-error");
+      nameEl.classList.add("invalid");
+      valid = false;
+    } else {
+      nameGrp.classList.remove("has-error");
+      nameEl.classList.remove("invalid");
+    }
+
+    if (!selectedFG) {
+      document.getElementById("fg-error").classList.add("show");
+      valid = false;
+    }
+    if (!selectedBG) {
+      document.getElementById("bg-error").classList.add("show");
+      valid = false;
+    }
+    if (!valid) return;
+
+    var row = {
+      Name:        nameEl.value.trim(),
+      intro_text:  document.getElementById("f-intro").value.trim(),
+      body_text:   document.getElementById("f-body").value.trim(),
+      price_text:  document.getElementById("f-price").value.trim(),
+      product:     document.getElementById("f-product").value.trim(),
+      foreground:  selectedFG,
+      background:  selectedBG
+    };
+
+    batch.push(row);
+    renderTable();
+    clearForm();
+    showToast("Row added ✓");
+  });
+
+  // ── Render Table ───────────────────────────────────────────────────────────
+  function renderTable() {
+    var tbody = document.getElementById("batch-body");
+    tbody.innerHTML = "";
+
+    if (batch.length === 0) {
+      tbody.innerHTML = '<tr id="empty-row"><td colspan="8"><div class="empty-state"><div class="icon">📋</div>No rows yet — fill in the form above and click Add Row.</div></td></tr>';
+      document.getElementById("batch-count").textContent = "0 rows";
+      document.getElementById("btn-download").disabled = true;
+      return;
+    }
+
+    batch.forEach(function(row, i) {
+      var tr = document.createElement("tr");
+      ["Name","intro_text","body_text","price_text","product","foreground","background"].forEach(function(key) {
+        var td = document.createElement("td");
+        td.textContent = row[key] || "—";
+        td.title = row[key] || "";
+        tr.appendChild(td);
+      });
+      var tdDel = document.createElement("td");
+      var btn = document.createElement("button");
+      btn.className = "btn-delete";
+      btn.innerHTML = "✕";
+      btn.title = "Remove row";
+      btn.addEventListener("click", (function(idx) {
+        return function() { batch.splice(idx, 1); renderTable(); showToast("Row removed"); };
+      })(i));
+      tdDel.appendChild(btn);
+      tr.appendChild(tdDel);
+      tbody.appendChild(tr);
+    });
+
+    var label = batch.length === 1 ? "1 row" : batch.length + " rows";
+    document.getElementById("batch-count").textContent = label;
+    document.getElementById("btn-download").disabled = false;
+  }
+
+  // ── Clear Form ─────────────────────────────────────────────────────────────
+  function clearForm() {
+    ["f-name","f-intro","f-body","f-price","f-product"].forEach(function(id) {
+      document.getElementById(id).value = "";
+    });
+    selectedFG = null;
+    selectedBG = null;
+    document.querySelectorAll(".thumb-card").forEach(function(c) { c.classList.remove("selected"); });
+    document.getElementById("fg-mobile").value = "";
+    document.getElementById("bg-mobile").value = "";
+    document.getElementById("fg-error").classList.remove("show");
+    document.getElementById("bg-error").classList.remove("show");
+    document.getElementById("f-name").focus();
+  }
+
+  // ── Clear All ──────────────────────────────────────────────────────────────
+  document.getElementById("btn-clear").addEventListener("click", function() {
+    if (batch.length === 0) return;
+    if (confirm("Clear all " + batch.length + " row(s)?")) {
+      batch = [];
+      renderTable();
+      clearForm();
+    }
+  });
+
+  // ── Download CSV ───────────────────────────────────────────────────────────
+  document.getElementById("btn-download").addEventListener("click", function() {
+    if (batch.length === 0) return;
+    var headers = ["Name","intro_text","body_text","price_text","product","foreground","background"];
+    var lines = [headers.join(",")];
+    batch.forEach(function(row) {
+      var cells = headers.map(function(h) {
+        var val = (row[h] || "").toString().replace(/"/g, '""');
+        return val.indexOf(",") > -1 || val.indexOf('"') > -1 ? '"' + val + '"' : val;
+      });
+      lines.push(cells.join(","));
+    });
+    var csv  = lines.join("\n");
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement("a");
+    a.href     = url;
+    a.download = "batch_please_" + timestamp() + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("CSV downloaded ✓");
+  });
+
+  function timestamp() {
+    var d = new Date();
+    return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes());
+  }
+  function pad(n) { return n < 10 ? "0" + n : n; }
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  var toastTimer;
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2000);
+  }
+
+  // ── Enter key on name field adds row ──────────────────────────────────────
+  document.getElementById("f-name").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") document.getElementById("btn-add").click();
+  });
+</script>
+</body>
+</html>
